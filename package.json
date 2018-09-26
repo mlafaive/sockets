@@ -1,11 +1,11 @@
 {
-  "name": "socketcluster-sample",
+  "name": "sockets",
   "description": "A sample SocketCluster app",
   "version": "1.0.0",
   "contributors": [
     {
-      "name": "Jonathan Gros-Dubois",
-      "email": "grosjona@yahoo.com.au"
+      "name": "Mitch LaFaive",
+      "email": "mitchlafaive@gmail.com"
     }
   ],
   "dependencies": {
@@ -30,6 +30,7 @@
   ],
   "readmeFilename": "README.md",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "deploy": "git push heroku master"
   }
 }

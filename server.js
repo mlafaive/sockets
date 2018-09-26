@@ -15,7 +15,7 @@ var environment = process.env.ENV || 'dev';
 var options = {
   workers: 1,
   brokers: 1,
-  port: 8000,
+  port: process.env.PORT || 8000,
   wsEngine: 'sc-uws',
   workerController: __dirname + '/worker.js',
 
