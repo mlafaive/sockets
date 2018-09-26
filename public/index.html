@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>SocketCluster</title>
+    <link rel="icon" type="image/png" href="/favicon.ico">
+    <script type="text/javascript" src="/socketcluster.js"></script>
+  </head>
+  <body>
+    <div class="container">
+      <ul id="messages"></ul>
+      <input id="input" type="text"/>
+    </div>
+    <script type="text/javascript">
+      function addMessage(msg) {
+        var elt = document.createElement("li"); 
+        var content = document.createTextNode(msg); 
+        elt.appendChild(content);
+        document.getElementById('messages').appendChild(elt);
+      }
+      var xhttp = new XMLHttpRequest();
+      xhttp.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+          var messages = JSON.parse(this.response);
+          for (var i = 0; i < messages.length; i++) {
+            addMessage(messages[i]);
+          }
+          socket.on('connect', function () {
+            var sampleChannel = socket.subscribe('chat');
+
+            sampleChannel.watch(addMessage);
+
+            document.getElementById('input').onkeypress = function(evt) {
+              if (evt.keyCode === 13) {
+                socket.emit('chat', evt.target.value);
+                evt.target.value = '';
+              }
+            }
+            
+          });
+        }
+      };
+      xhttp.open("GET", "/messages", true);
+      xhttp.send();
+      var socket = socketCluster.connect();
+
+      socket.on('error', function (err) {
+        console.error(err);
+      });
+    </script>
+  </body>
+</html>
