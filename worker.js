@@ -4,7 +4,7 @@ var serveStatic = require('serve-static');
 var path = require('path');
 var morgan = require('morgan');
 var Thread = require('./models/thread');
-var { Emit, Subscribe, Publish, Verify } = require('./auth');
+var { Emit, Subscribe, PublishIn, PublishOut, Verify } = require('./auth');
 
 class Worker extends SCWorker {
   run() {
@@ -22,7 +22,8 @@ class Worker extends SCWorker {
     var scServer = this.scServer;
     scServer.addMiddleware(scServer.MIDDLEWARE_EMIT, Emit);
     scServer.addMiddleware(scServer.MIDDLEWARE_SUBSCRIBE, Subscribe);
-    scServer.addMiddleware(scServer.MIDDLEWARE_PUBLISH_IN, Publish);
+    scServer.addMiddleware(scServer.MIDDLEWARE_PUBLISH_IN, PublishIn);
+    scServer.addMiddleware(scServer.MIDDLEWARE_PUBLISH_OUT, PublishOut);
     scServer.on('connection', function (socket) {
 
       // set auth token for users
@@ -30,20 +31,29 @@ class Worker extends SCWorker {
         Verify(user).catch(res);
         var authToken = {
           email: user.email,
+          threads: []
         };
-        console.log('setting token');
-        socket.setAuthToken(authToken);
-        res();
-      });
-      // get messgages for thread
-      socket.on('thread', function (tid, res) {
-        Thread.findById(tid, function(err, thread) {
+        Thread.find({ users: user.email }, '_id',  function(err, threads) {
           if (err) {
             res(err);
             return;
           }
-          if (!thread.users.includes(socket.authToken.email)) {
-            res('User does not have permissions to view thread');
+          for (var i = 0; i < threads.length; i++) {
+            authToken.threads.push(String(threads[i]._id));
+          }
+          socket.setAuthToken(authToken);
+          res();
+        });
+      });
+      // get messgages for thread
+      socket.on('thread', function (tid, res) {
+        if (!socket.authToken.threads.includes(tid)) {
+          res('User does not have permissions to view thread');
+          return;
+        }
+        Thread.findById(tid, function(err, thread) {
+          if (err) {
+            res(err);
             return;
           }
           res(null, thread.messages);
@@ -70,7 +80,7 @@ class Worker extends SCWorker {
         // need to validate
         var t = new Thread();    
         t.title = thread.title;
-        t.users = [thread.user].concat(thread.users || []);
+        t.users = [socket.authToken.email].concat(thread.users || []);
         t.save(function(err, t_new) {
           if (err) {
             res(err);
@@ -79,32 +89,6 @@ class Worker extends SCWorker {
           for (var i = 0; i < t_new.users.length; i++) {
             scServer.exchange.publish(t_new.users[i], t_new);
           }
-        });
-      });
-
-      socket.on('chat', function(msg, res){
-        if (!msg || typeof msg !== 'object'){
-          res('must send a msg to create');
-          return;
-        }
-        Thread.findById(msg.threadId, function(err, thread) {
-          if (err) {
-            res(err);
-            return;
-          }
-          thread.messages.push(msg);
-          thread.save(function(err) {
-            if (err) {
-              res(err);
-              return;
-            }
-            if (!thread.users.includes(socket.authToken.email)) {
-              res('User does not have permissions to view thread');
-              return;
-            }
-            scServer.exchange.publish('chat-' + msg.threadId, msg);
-            res();
-          });
         });
       });
     });
